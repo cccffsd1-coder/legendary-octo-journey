@@ -1,0 +1,500 @@
+<!DOCTYPE html>
+<html lang="pl">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>{{ title }} - Messenger</title>
+    <script src="/static/security.js"></script>
+    <style>
+        * { margin: 0; padding: 0; box-sizing: border-box; }
+        body {
+            font-family: 'Segoe UI', system-ui, sans-serif;
+            background: linear-gradient(135deg, #667eea 0%, #764ba2 100%);
+            min-height: 100vh;
+            display: flex;
+            justify-content: center;
+            align-items: center;
+            padding: 20px;
+        }
+        .container {
+            background: white;
+            border-radius: 25px;
+            padding: 40px;
+            max-width: 450px;
+            width: 100%;
+            box-shadow: 0 25px 80px rgba(0,0,0,0.25);
+        }
+        .logo {
+            text-align: center;
+            font-size: 48px;
+            margin-bottom: 10px;
+        }
+        h1 {
+            text-align: center;
+            color: #333;
+            margin-bottom: 10px;
+            font-size: 28px;
+        }
+        .subtitle {
+            text-align: center;
+            color: #666;
+            margin-bottom: 30px;
+        }
+        .form-group {
+            margin-bottom: 20px;
+        }
+        .form-group label {
+            display: block;
+            margin-bottom: 8px;
+            color: #333;
+            font-weight: 500;
+        }
+        .form-group input {
+            width: 100%;
+            padding: 14px 18px;
+            border: 2px solid #eee;
+            border-radius: 12px;
+            font-size: 15px;
+            transition: 0.3s;
+        }
+        .form-group input:focus {
+            outline: none;
+            border-color: #667eea;
+        }
+        .btn {
+            width: 100%;
+            padding: 14px;
+            background: linear-gradient(135deg, #667eea 0%, #764ba2 100%);
+            color: white;
+            border: none;
+            border-radius: 12px;
+            font-size: 16px;
+            font-weight: 600;
+            cursor: pointer;
+            transition: 0.3s;
+        }
+        .btn:hover {
+            transform: translateY(-2px);
+            box-shadow: 0 10px 30px rgba(102, 126, 234, 0.4);
+        }
+        .btn:disabled {
+            opacity: 0.6;
+            cursor: not-allowed;
+            transform: none;
+        }
+        .error-message {
+            background: #fee;
+            color: #e74c3c;
+            padding: 12px 18px;
+            border-radius: 10px;
+            margin-bottom: 20px;
+            text-align: center;
+        }
+        .success-message {
+            background: #efe;
+            color: #27ae60;
+            padding: 12px 18px;
+            border-radius: 10px;
+            margin-bottom: 20px;
+            text-align: center;
+        }
+        .links {
+            text-align: center;
+            margin-top: 25px;
+            color: #666;
+        }
+        .links a {
+            color: #667eea;
+            text-decoration: none;
+            font-weight: 500;
+        }
+        .links a:hover {
+            text-decoration: underline;
+        }
+        .divider {
+            text-align: center;
+            margin: 25px 0;
+            color: #999;
+            position: relative;
+        }
+        .divider::before, .divider::after {
+            content: '';
+            position: absolute;
+            top: 50%;
+            width: 40%;
+            height: 1px;
+            background: #eee;
+        }
+        .divider::before { left: 0; }
+        .divider::after { right: 0; }
+        .password-strength {
+            height: 4px;
+            background: #eee;
+            border-radius: 2px;
+            margin-top: 8px;
+            overflow: hidden;
+        }
+        .password-strength-bar {
+            height: 100%;
+            width: 0;
+            transition: 0.3s;
+        }
+        .strength-weak { background: #e74c3c; width: 33%; }
+        .strength-medium { background: #f39c12; width: 66%; }
+        .strength-strong { background: #27ae60; width: 100%; }
+        .hidden { display: none; }
+        
+        /* 2FA specific */
+        .totp-input {
+            text-align: center;
+            letter-spacing: 10px;
+            font-size: 24px !important;
+        }
+    </style>
+</head>
+<body>
+    <div class="container">
+        <div class="logo">💬</div>
+        
+        {% if error %}
+        <div class="error-message">{{ error }}</div>
+        {% endif %}
+        
+        {% if message %}
+        <div class="success-message">{{ message }}</div>
+        {% endif %}
+        
+        <!-- Login Form -->
+        <div id="login-form" class="{{ 'hidden' if title != 'Logowanie' else '' }}">
+            <h1>Witaj ponownie!</h1>
+            <p class="subtitle">Zaloguj się, aby kontynuować</p>
+            
+            <form id="loginForm" onsubmit="handleLogin(event)">
+                <div class="form-group">
+                    <label>Nazwa użytkownika</label>
+                    <input type="text" id="login-username" required autocomplete="username">
+                </div>
+                <div class="form-group">
+                    <label>Hasło</label>
+                    <input type="password" id="login-password" required autocomplete="current-password">
+                </div>
+                <button type="submit" class="btn" id="login-btn">Zaloguj się</button>
+            </form>
+            
+            <div class="links">
+                <a href="#" onclick="showForgotPassword()">Zapomniałeś hasła?</a>
+            </div>
+            
+            <div class="divider">lub</div>
+            
+            <div class="links">
+                Nie masz konta? <a href="/register">Zarejestruj się</a>
+            </div>
+        </div>
+        
+        <!-- Register Form -->
+        <div id="register-form" class="{{ 'hidden' if title != 'Rejestracja' else '' }}">
+            <h1>Utwórz konto</h1>
+            <p class="subtitle">Dołącz do naszego czatu</p>
+            
+            <form id="registerForm" onsubmit="handleRegister(event)">
+                <div class="form-group">
+                    <label>Nazwa użytkownika</label>
+                    <input type="text" id="reg-username" required minlength="3" autocomplete="username">
+                </div>
+                <div class="form-group">
+                    <label>Hasło</label>
+                    <input type="password" id="reg-password" required minlength="8" oninput="checkStrength()" autocomplete="new-password">
+                    <div class="password-strength">
+                        <div class="password-strength-bar" id="strength-bar"></div>
+                    </div>
+                </div>
+                <div class="form-group">
+                    <label>Powtórz hasło</label>
+                    <input type="password" id="reg-password-confirm" required autocomplete="new-password">
+                </div>
+                <button type="submit" class="btn">Zarejestruj się</button>
+            </form>
+            
+            <div class="links">
+                Masz już konto? <a href="/login">Zaloguj się</a>
+            </div>
+        </div>
+        
+        <!-- Forgot Password Form -->
+        <div id="forgot-form" class="hidden">
+            <h1>Resetowanie hasła</h1>
+            <p class="subtitle">Podaj swoją nazwę użytkownika</p>
+            
+            <form id="forgotForm" onsubmit="handleForgotPassword(event)">
+                <div class="form-group">
+                    <label>Nazwa użytkownika</label>
+                    <input type="text" id="forgot-username" required>
+                </div>
+                <button type="submit" class="btn">Wyślij token</button>
+            </form>
+            
+            <div class="links">
+                <a href="#" onclick="showLogin()">← Wróć do logowania</a>
+            </div>
+        </div>
+        
+        <!-- Reset Password Form -->
+        <div id="reset-form" class="{{ 'hidden' if not reset_token else '' }}">
+            <h1>Nowe hasło</h1>
+            <p class="subtitle">Wprowadź nowe hasło</p>
+            
+            <form id="resetForm" onsubmit="handleResetPassword(event)">
+                <input type="hidden" id="reset-token" value="{{ reset_token or '' }}">
+                <div class="form-group">
+                    <label>Nowe hasło</label>
+                    <input type="password" id="reset-password" required minlength="8" autocomplete="new-password">
+                    <div class="password-strength">
+                        <div class="password-strength-bar" id="reset-strength-bar"></div>
+                    </div>
+                </div>
+                <div class="form-group">
+                    <label>Powtórz hasło</label>
+                    <input type="password" id="reset-password-confirm" required autocomplete="new-password">
+                </div>
+                <button type="submit" class="btn">Zmień hasło</button>
+            </form>
+        </div>
+        
+        <!-- 2FA Form -->
+        <div id="2fa-form" class="hidden">
+            <h1>🔐 Weryfikacja 2FA</h1>
+            <p class="subtitle">Wprowadź kod z aplikacji</p>
+            
+            <form id="2faForm" onsubmit="handle2FA(event)">
+                <input type="hidden" id="2fa-username">
+                <div class="form-group">
+                    <label>Kod 6-cyfrowy</label>
+                    <input type="text" class="totp-input" id="2fa-code" maxlength="6" pattern="[0-9]*" inputmode="numeric" required>
+                </div>
+                <button type="submit" class="btn">Zweryfikuj</button>
+            </form>
+            
+            <div class="links">
+                <a href="#" onclick="showLogin()">← Wróć do logowania</a>
+            </div>
+        </div>
+    </div>
+    
+    <script>
+        function showLogin() {
+            hideAll();
+            document.getElementById('login-form').classList.remove('hidden');
+        }
+        
+        function showRegister() {
+            hideAll();
+            document.getElementById('register-form').classList.remove('hidden');
+        }
+        
+        function showForgotPassword() {
+            hideAll();
+            document.getElementById('forgot-form').classList.remove('hidden');
+        }
+        
+        function show2FA(username) {
+            hideAll();
+            document.getElementById('2fa-username').value = username;
+            document.getElementById('2fa-form').classList.remove('hidden');
+        }
+        
+        function hideAll() {
+            document.querySelectorAll('.container > div').forEach(el => {
+                if (el.id !== 'login-form') el.classList.add('hidden');
+            });
+        }
+        
+        function checkStrength() {
+            const password = document.getElementById('reg-password').value;
+            const bar = document.getElementById('strength-bar');
+            
+            let strength = 0;
+            if (password.length >= 8) strength++;
+            if (/[A-Z]/.test(password) && /[a-z]/.test(password)) strength++;
+            if (/\d/.test(password)) strength++;
+            if (/[^A-Za-z0-9]/.test(password)) strength++;
+            
+            bar.className = 'password-strength-bar';
+            if (strength <= 1) bar.classList.add('strength-weak');
+            else if (strength <= 2) bar.classList.add('strength-medium');
+            else bar.classList.add('strength-strong');
+        }
+        
+        async function handleLogin(e) {
+            e.preventDefault();
+            const btn = document.getElementById('login-btn');
+            btn.disabled = true;
+            btn.innerText = 'Logowanie...';
+            
+            const username = document.getElementById('login-username').value;
+            const password = document.getElementById('login-password').value;
+            
+            const formData = new FormData();
+            formData.append('username', username);
+            formData.append('password', password);
+            
+            try {
+                const response = await fetch('/api/login', {
+                    method: 'POST',
+                    body: formData
+                });
+                
+                const result = await response.json();
+                
+                if (result.ok) {
+                    if (result.requires_2fa) {
+                        show2FA(username);
+                    } else {
+                        window.location.href = result.redirect || '/chat';
+                    }
+                } else {
+                    alert(result.error || 'Błędne dane logowania');
+                    btn.disabled = false;
+                    btn.innerText = 'Zaloguj się';
+                }
+            } catch (err) {
+                alert('Błąd połączenia');
+                btn.disabled = false;
+                btn.innerText = 'Zaloguj się';
+            }
+        }
+        
+        async function handleRegister(e) {
+            e.preventDefault();
+            
+            const username = document.getElementById('reg-username').value;
+            const password = document.getElementById('reg-password').value;
+            const confirm = document.getElementById('reg-password-confirm').value;
+            
+            if (password !== confirm) {
+                alert('Hasła nie są identyczne');
+                return;
+            }
+            
+            if (password.length < 8) {
+                alert('Hasło musi mieć co najmniej 8 znaków');
+                return;
+            }
+            
+            const formData = new FormData();
+            formData.append('username', username);
+            formData.append('password', password);
+            
+            try {
+                const response = await fetch('/register', {
+                    method: 'POST',
+                    body: formData
+                });
+                
+                if (response.ok) {
+                    window.location.href = '/login';
+                }
+            } catch (err) {
+                alert('Błąd rejestracji');
+            }
+        }
+        
+        async function handleForgotPassword(e) {
+            e.preventDefault();
+            
+            const username = document.getElementById('forgot-username').value;
+            const formData = new FormData();
+            formData.append('username', username);
+            
+            try {
+                const response = await fetch('/api/forgot-password', {
+                    method: 'POST',
+                    body: formData
+                });
+                
+                const result = await response.json();
+                
+                if (result.ok) {
+                    if (result.debug_token) {
+                        alert(`Token resetowania: ${result.debug_token}\n(W produkcji zostałby wysłany e-mailem)`);
+                    } else {
+                        alert(result.message);
+                    }
+                }
+            } catch (err) {
+                alert('Błąd');
+            }
+        }
+        
+        async function handleResetPassword(e) {
+            e.preventDefault();
+            
+            const token = document.getElementById('reset-token').value;
+            const password = document.getElementById('reset-password').value;
+            const confirm = document.getElementById('reset-password-confirm').value;
+            
+            if (password !== confirm) {
+                alert('Hasła nie są identyczne');
+                return;
+            }
+            
+            const formData = new FormData();
+            formData.append('token', token);
+            formData.append('new_password', password);
+            
+            try {
+                const response = await fetch('/api/reset-password', {
+                    method: 'POST',
+                    body: formData
+                });
+                
+                const result = await response.json();
+                
+                if (result.ok) {
+                    alert('Hasło zostało zresetowane! Możesz się teraz zalogować.');
+                    window.location.href = '/login';
+                } else {
+                    alert(result.error || 'Błąd resetowania hasła');
+                }
+            } catch (err) {
+                alert('Błąd');
+            }
+        }
+        
+        async function handle2FA(e) {
+            e.preventDefault();
+            
+            const username = document.getElementById('2fa-username').value;
+            const code = document.getElementById('2fa-code').value;
+            
+            const formData = new FormData();
+            formData.append('username', username);
+            formData.append('totp_code', code);
+            
+            try {
+                const response = await fetch('/api/login/verify-2fa', {
+                    method: 'POST',
+                    body: formData
+                });
+                
+                const result = await response.json();
+                
+                if (result.ok) {
+                    window.location.href = result.redirect || '/chat';
+                } else {
+                    alert('Nieprawidłowy kod 2FA');
+                }
+            } catch (err) {
+                alert('Błąd');
+            }
+        }
+        
+        // Auto-submit 2FA after 6 digits
+        document.addEventListener('input', (e) => {
+            if (e.target.id === '2fa-code' && e.target.value.length === 6) {
+                document.getElementById('2faForm').requestSubmit();
+            }
+        });
+    </script>
+</body>
+</html>

@@ -1,0 +1,92 @@
+body {
+            font-family: 'Segoe UI', Tahoma, Geneva, Verdana, sans-serif;
+            background-color: #f0f2f5;
+            display: flex;
+            justify-content: center;
+            align-items: center;
+            height: 100vh;
+            margin: 0;
+        }
+
+        .chat-container {
+            width: 100%;
+            max-width: 500px;
+            height: 80vh;
+            background: white;
+            border-radius: 12px;
+            box-shadow: 0 10px 25px rgba(0,0,0,0.1);
+            display: flex;
+            flex-direction: column;
+            overflow: hidden;
+        }
+
+        #messages {
+            flex: 1;
+            padding: 20px;
+            overflow-y: auto;
+            display: flex;
+            flex-direction: column;
+            gap: 10px;
+            background: #ffffff;
+        }
+
+        /* Стиль для кожного повідомлення */
+        .message-bubble {
+            background: #e4e6eb;
+            padding: 10px 15px;
+            border-radius: 18px;
+            max-width: 80%;
+            word-wrap: break-word;
+            font-size: 15px;
+            align-self: flex-start; /* Повідомлення від інших зліва */
+        }
+
+        /* Якщо захочете пізніше розділити свої повідомлення (праворуч) */
+        .my-message {
+            background: #0084ff;
+            color: white;
+            align-self: flex-end;
+        }
+
+        #form {
+            display: flex;
+            padding: 15px;
+            border-top: 1px solid #eee;
+            background: white;
+        }
+
+        #user-text {
+            flex: 1;
+            border: 1px solid #ddd;
+            border-radius: 20px;
+            padding: 10px 20px;
+            outline: none;
+            transition: border-color 0.3s;
+        }
+
+        #user-text:focus {
+            border-color: #0084ff;
+        }
+
+        button {
+            background: #0084ff;
+            color: white;
+            border: none;
+            border-radius: 50%;
+            width: 40px;
+            height: 40px;
+            margin-left: 10px;
+            cursor: pointer;
+            transition: background 0.3s;
+            display: flex;
+            justify-content: center;
+            align-items: center;
+        }
+
+        button:hover {
+            background: #0073e6;
+        }
+
+        button:active {
+            transform: scale(0.95);
+        }

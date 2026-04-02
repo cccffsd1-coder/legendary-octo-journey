@@ -1,0 +1,317 @@
+<!DOCTYPE html>
+<html lang="pl">
+<head>
+    <meta charset="UTF-8">
+    <title>Messenger - Premium Edition</title>
+
+    <meta http-equiv="Content-Security-Policy" content="default-src 'self'; script-src 'self' 'unsafe-inline' https://cdn.jsdelivr.net https://cdnjs.cloudflare.com; style-src 'self' 'unsafe-inline' https://cdn.jsdelivr.net https://fonts.googleapis.com; font-src https://fonts.gstatic.com; img-src 'self' data: https: blob:;">
+    <meta http-equiv="X-Content-Type-Options" content="nosniff">
+    <meta http-equiv="X-XSS-Protection" content="1; mode=block">
+    <meta http-equiv="Referrer-Policy" content="strict-origin-when-cross-origin">
+
+    <script src="https://cdn.jsdelivr.net/npm/dompurify@3.0.6/dist/purify.min.js"></script>
+    <script src="https://cdn.jsdelivr.net/npm/marked@11.0.0/marked.min.js"></script>
+    <script type="module" src="https://cdn.jsdelivr.net/npm/emoji-mart@5.5.0/+esm"></script>
+
+    <style>
+        *, *::before, *::after { box-sizing: border-box; margin: 0; padding: 0; }
+        :root {
+            --primary: #111; --bg: #f5f4f1; --sidebar-bg: rgba(255, 255, 255, 0.7);
+            --text: #111; --text-muted: #888; --border: rgba(0, 0, 0, 0.06);
+            --my-msg: linear-gradient(135deg, #111 0%, #333 100%);
+            --other-msg: #ffffff; --card-bg: #fff; --sidebar-w: 280px; --accent: #3a5bd9;
+        }
+        body.dark-mode {
+            --bg: #0a0a0a; --sidebar-bg: rgba(20, 20, 20, 0.7); --text: #f5f4f1;
+            --text-muted: #666; --border: rgba(255, 255, 255, 0.08);
+            --my-msg: linear-gradient(135deg, #3a5bd9 0%, #2a4bb9 100%);
+            --other-msg: #1a1a1a; --card-bg: #141414; --primary: #fff;
+        }
+
+        body { font-family: 'Segoe UI', sans-serif; background: var(--bg); display: flex; height: 100vh; color: var(--text); overflow: hidden; }
+
+        /* Cursor & Blobs */
+        .cursor { width: 20px; height: 20px; background: #fff; mix-blend-mode: difference; position: fixed; pointer-events: none; z-index: 9999; border-radius: 50%; transform: translate(-50%, -50%); transition: width 0.3s, height 0.3s; }
+        .bg-blobs { position: fixed; top: 0; left: 0; width: 100%; height: 100%; z-index: -1; overflow: hidden; }
+        .blob { position: absolute; border-radius: 50%; filter: blur(80px); opacity: 0.15; animation: move 20s infinite alternate; }
+        .blob-1 { width: 400px; height: 400px; background: var(--accent); top: -100px; right: -100px; }
+        .blob-2 { width: 300px; height: 300px; background: #ff4d4d; bottom: -50px; left: -50px; }
+        @keyframes move { from { transform: translate(0, 0); } to { transform: translate(100px, 100px); } }
+
+        /* Sidebar */
+        .sidebar { width: var(--sidebar-w); background: var(--sidebar-bg); backdrop-filter: blur(20px); border-right: 1px solid var(--border); display: flex; flex-direction: column; }
+        .sidebar-header { padding: 20px; }
+        .mode-toggle { cursor: pointer; font-size: 11px; padding: 5px 10px; border: 1px solid var(--border); border-radius: 20px; width: fit-content; }
+        .search-input { width: 100%; padding: 8px; border-radius: 12px; border: 1px solid var(--border); margin-top: 10px; background: transparent; color: var(--text); }
+        #user-list { flex: 1; overflow-y: auto; }
+        .user-item { padding: 15px 20px; cursor: pointer; display: flex; align-items: center; transition: 0.3s; }
+        .user-item:hover { background: rgba(128,128,128,0.05); }
+        .user-item.active { background: rgba(58, 91, 217, 0.1); border-left: 4px solid var(--accent); }
+        .user-avatar-small { width: 36px; height: 36px; border-radius: 50%; margin-right: 12px; }
+
+        /* Chat Area */
+        .chat-area { flex: 1; display: flex; flex-direction: column; position: relative; }
+        .chat-header { padding: 15px 30px; background: var(--sidebar-bg); backdrop-filter: blur(25px); border-bottom: 1px solid var(--border); display: flex; align-items: center; gap: 15px; }
+        #messages { flex: 1; padding: 20px; overflow-y: auto; display: flex; flex-direction: column; gap: 10px; }
+        .message-bubble { padding: 12px 18px; border-radius: 18px; max-width: 70%; position: relative; animation: fadeIn 0.3s ease; }
+        @keyframes fadeIn { from { opacity: 0; transform: translateY(10px); } to { opacity: 1; transform: translateY(0); } }
+        .my-message { background: var(--my-msg); color: #fff; align-self: flex-end; border-bottom-right-radius: 4px; }
+        .other-message { background: var(--other-msg); color: var(--text); align-self: flex-start; border-bottom-left-radius: 4px; border: 1px solid var(--border); }
+
+        /* Input */
+        #form { padding: 20px; display: flex; align-items: center; gap: 10px; }
+        .input-container { flex: 1; background: var(--card-bg); border-radius: 24px; padding: 5px 15px; display: flex; align-items: center; border: 1px solid var(--border); }
+        #user-text { flex: 1; border: none; padding: 10px; background: transparent; color: var(--text); outline: none; }
+        .send-btn { width: 45px; height: 45px; border-radius: 50%; background: var(--accent); color: white; border: none; cursor: pointer; }
+
+        /* Notifications */
+        .notification-toggle-btn { position: fixed; top: 20px; right: 20px; width: 50px; height: 50px; border-radius: 50%; background: var(--accent); color: white; border: none; cursor: pointer; z-index: 1000; font-size: 20px; display: flex; justify-content: center; align-items: center; }
+        .notification-panel { position: fixed; top: 0; right: -400px; width: 350px; height: 100vh; background: var(--card-bg); z-index: 10001; transition: 0.3s; box-shadow: -5px 0 20px rgba(0,0,0,0.1); display: flex; flex-direction: column; }
+        .notification-panel.open { right: 0; }
+        .notification-header { padding: 20px; background: var(--accent); color: white; display: flex; justify-content: space-between; }
+        .notification-list { flex: 1; overflow-y: auto; padding: 10px; }
+        .notification-item { padding: 12px; border-bottom: 1px solid var(--border); cursor: pointer; }
+        .notification-item.unread { background: rgba(58, 91, 217, 0.05); }
+        .notification-overlay { position: fixed; inset: 0; background: rgba(0,0,0,0.4); z-index: 10000; display: none; }
+        .notification-overlay.show { display: block; }
+        .status-indicator { width: 10px; height: 10px; border-radius: 50%; background: #ccc; position: absolute; bottom: 0; right: 0; border: 2px solid var(--card-bg); }
+        .status-indicator.online { background: #4caf50; }
+    </style>
+</head>
+<body>
+
+<div class="cursor"></div>
+<div class="bg-blobs"><div class="blob blob-1"></div><div class="blob blob-2"></div></div>
+
+<button class="notification-toggle-btn" onclick="toggleNotificationPanel()">
+    🔔 <span id="notification-count-badge" style="display:none; position:absolute; top:0; right:0; background:red; font-size:10px; padding:2px 6px; border-radius:10px;">0</span>
+</button>
+
+<div class="notification-overlay" id="notification-overlay" onclick="toggleNotificationPanel()"></div>
+<div class="notification-panel" id="notification-panel">
+    <div class="notification-header">
+        <h3>Powiadomienia</h3>
+        <button onclick="toggleNotificationPanel()" style="background:none; border:none; color:white; font-size:20px; cursor:pointer;">&times;</button>
+    </div>
+    <button onclick="markAllRead()" style="padding:10px; width:100%; border:none; cursor:pointer;">Oznacz wszystkie jako przeczytane</button>
+    <div class="notification-list" id="notification-list"></div>
+</div>
+
+<div class="sidebar">
+    <div class="sidebar-header">
+        <div class="mode-toggle" id="mode-toggle"><span id="mode-icon">🌙</span> Dark Mode</div>
+        <input type="text" id="search-users" class="search-input" placeholder="Szukaj użytkowników...">
+    </div>
+    <div id="user-list">
+        {% for user in users %}
+        <div class="user-item" id="user-{{ user.user_name }}" data-name="{{ user.user_name }}" onclick="selectUser('{{ user.user_name }}', '{{ user.avatar_url }}')">
+            <div style="position: relative;">
+                <img src="{{ user.avatar_url or '/static/default-avatar.png' }}" class="user-avatar-small">
+                <span class="status-indicator {{ 'online' if user.status == 'online' }}" id="status-{{ user.user_name }}"></span>
+            </div>
+            <span>{{ user.user_name }}</span>
+        </div>
+        {% endfor %}
+    </div>
+    <div class="sidebar-footer" style="padding: 20px;">
+        <a href="/logout" style="text-decoration:none; color:var(--text-muted); font-size:12px;">Wyloguj się</a>
+    </div>
+</div>
+
+<div class="chat-area">
+    <div class="chat-header">
+        <div id="header-avatar-container"></div>
+        <div>
+            <div id="chat-title" style="font-weight:bold;">Wybierz użytkownika</div>
+            <div id="typing-indicator" style="display:none; font-size:12px; color:var(--accent);">pisze...</div>
+        </div>
+    </div>
+    <div id="messages"></div>
+    <form id="form">
+        <input type="file" id="file-input" style="display:none">
+        <button type="button" onclick="document.getElementById('file-input').click()" style="background:none; border:none; font-size:20px; cursor:pointer;">📎</button>
+        <div class="input-container">
+            <input type="text" id="user-text" placeholder="Napisz wiadomość..." autocomplete="off">
+        </div>
+        <button type="submit" class="send-btn">➤</button>
+    </form>
+</div>
+
+<script>
+    const userName = "{{ current_user }}";
+    const ws = new WebSocket(`ws://${window.location.host}/ws/${encodeURIComponent(userName)}`);
+    const messagesDiv = document.getElementById('messages');
+    let selectedReceiver = null;
+    let typingTimeout = null;
+    let notifications = [];
+
+    console.log('Chat initialized for user:', userName);
+    console.log('WebSocket URL:', ws.url);
+
+    // Debug - sprawdź czy messagesDiv istnieje
+    if (!messagesDiv) {
+        console.error('ERROR: messagesDiv element not found!');
+    } else {
+        console.log('messagesDiv found:', messagesDiv);
+    }
+
+    // Połączona obsługa WebSocket
+    ws.onopen = () => {
+        console.log('WebSocket connected');
+    };
+    
+    ws.onclose = () => {
+        console.log('WebSocket disconnected');
+    };
+    
+    ws.onerror = (err) => {
+        console.error('WebSocket error:', err);
+    };
+
+    ws.onmessage = (e) => {
+        console.log('WebSocket message received:', e.data);
+        const data = JSON.parse(e.data);
+
+        if (data.type === 'typing' && data.sender === selectedReceiver) {
+            document.getElementById('typing-indicator').style.display = 'block';
+            clearTimeout(typingTimeout);
+            typingTimeout = setTimeout(() => { document.getElementById('typing-indicator').style.display = 'none'; }, 2000);
+            return;
+        }
+
+        if (data.type === "status") {
+            const el = document.getElementById(`status-${data.username}`);
+            if (el) el.classList.toggle('online', data.status === 'online');
+            return;
+        }
+
+        if (data.sender === selectedReceiver || data.sender === userName) {
+            console.log('Appending message from:', data.sender, 'text:', data.text);
+            if (data.type === 'message' && data.text) appendMessage(data.sender, data.text, data.id);
+            if (data.type === 'file') appendFile(data.sender, data.file_name, data.file_url, data.id);
+        } else {
+            addNotification(data);
+        }
+    };
+
+    async function selectUser(name, avatarUrl) {
+        console.log('Selecting user:', name);
+        selectedReceiver = name;
+        document.getElementById('chat-title').innerText = name;
+        document.querySelectorAll('.user-item').forEach(el => el.classList.toggle('active', el.id === `user-${name}`));
+        
+        if (!messagesDiv) {
+            console.error('messagesDiv not found!');
+            return;
+        }
+        
+        messagesDiv.innerHTML = "";
+        console.log('Loading messages for:', name);
+
+        try {
+            const res = await fetch(`/messages/${encodeURIComponent(name)}`);
+            console.log('Messages response status:', res.status);
+            const history = await res.json();
+            console.log('Messages loaded:', history.length);
+            
+            history.forEach(m => {
+                console.log('Loading message:', m);
+                if (m.text) appendMessage(m.sender, m.text, m.id);
+                else if (m.file) appendFile(m.sender, m.file, m.file_url, m.id);
+            });
+        } catch (err) {
+            console.error('Error loading messages:', err);
+        }
+    }
+
+    function appendMessage(sender, text, id) {
+        console.log('appendMessage called:', { sender, text, id });
+        
+        if (!messagesDiv) {
+            console.error('messagesDiv is null!');
+            return;
+        }
+        
+        const msg = document.createElement('div');
+        msg.className = `message-bubble ${sender === userName ? 'my-message' : 'other-message'}`;
+        msg.innerHTML = `<div class="message-content">${DOMPurify.sanitize(marked.parse(text))}</div>`;
+        
+        console.log('Appending message element:', msg);
+        messagesDiv.appendChild(msg);
+        messagesDiv.scrollTop = messagesDiv.scrollHeight;
+        console.log('Message appended, scroll position:', messagesDiv.scrollTop);
+    }
+
+    function appendFile(sender, name, url, id) {
+        const msg = document.createElement('div');
+        msg.className = `message-bubble ${sender === userName ? 'my-message' : 'other-message'}`;
+        msg.innerHTML = `<a href="${url}" target="_blank" style="color:inherit;">📎 ${name}</a>`;
+        messagesDiv.appendChild(msg);
+        messagesDiv.scrollTop = messagesDiv.scrollHeight;
+    }
+
+    // Formularz
+    document.getElementById('form').onsubmit = (e) => {
+        e.preventDefault();
+        const text = document.getElementById('user-text');
+        if (text.value.trim() && selectedReceiver) {
+            ws.send(JSON.stringify({ to: selectedReceiver, text: text.value, type: 'message' }));
+            text.value = "";
+        }
+    };
+
+    // Powiadomienia
+    function addNotification(data) {
+        notifications.unshift({ sender: data.sender, text: data.text || 'Przesłał plik', read: false });
+        renderNotifications();
+    }
+
+    function renderNotifications() {
+        const list = document.getElementById('notification-list');
+        const badge = document.getElementById('notification-count-badge');
+        const unread = notifications.filter(n => !n.read).length;
+
+        badge.innerText = unread;
+        badge.style.display = unread > 0 ? 'block' : 'none';
+
+        list.innerHTML = notifications.map((n, i) => `
+            <div class="notification-item ${n.read ? '' : 'unread'}" onclick="handleNotificationClick(${i})">
+                <strong>${n.sender}</strong>: ${n.text}
+            </div>
+        `).join('');
+    }
+
+    function handleNotificationClick(index) {
+        const n = notifications[index];
+        n.read = true;
+        selectUser(n.sender);
+        toggleNotificationPanel();
+        renderNotifications();
+    }
+
+    function toggleNotificationPanel() {
+        document.getElementById('notification-panel').classList.toggle('open');
+        document.getElementById('notification-overlay').classList.toggle('show');
+    }
+
+    function markAllRead() {
+        notifications.forEach(n => n.read = true);
+        renderNotifications();
+    }
+
+    // Mode Toggle
+    document.getElementById('mode-toggle').onclick = () => {
+        document.body.classList.toggle('dark-mode');
+        localStorage.setItem('dark-mode', document.body.classList.contains('dark-mode') ? 'enabled' : 'disabled');
+    };
+
+    // Cursor
+    const cursor = document.querySelector(".cursor");
+    window.addEventListener("mousemove", e => {
+        cursor.style.left = `${e.clientX}px`;
+        cursor.style.top = `${e.clientY}px`;
+    });
+</script>
+
+</body>
+</html>

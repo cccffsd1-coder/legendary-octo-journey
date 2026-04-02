@@ -1,0 +1,401 @@
+<!DOCTYPE html>
+<html lang="pl">
+<head>
+<meta charset="UTF-8">
+<title>Modern Chat</title>
+
+<style>
+
+:root{
+--primary:#0084ff;
+--bg:#f0f2f5;
+--text:#1c1e21;
+--my-msg:#0084ff;
+--other-msg:#e4e6eb;
+}
+
+body{
+font-family:Segoe UI;
+background:var(--bg);
+display:flex;
+height:100vh;
+margin:0;
+color:var(--text);
+}
+
+.sidebar{
+width:300px;
+background:white;
+border-right:1px solid #ddd;
+display:flex;
+flex-direction:column;
+}
+
+.sidebar-header{
+padding:20px;
+background:var(--primary);
+color:white;
+font-weight:bold;
+}
+
+.user-item{
+padding:15px 20px;
+cursor:pointer;
+border-bottom:1px solid #f0f2f5;
+display:flex;
+justify-content:space-between;
+align-items:center;
+}
+
+.user-item:hover{
+background:#f5f6f7;
+}
+
+.user-item.active{
+background:#e7f3ff;
+border-left:4px solid var(--primary);
+}
+
+.notification{
+background:red;
+color:white;
+border-radius:50%;
+font-size:12px;
+padding:3px 7px;
+display:none;
+}
+
+.chat-area{
+flex:1;
+display:flex;
+flex-direction:column;
+background:white;
+}
+
+.chat-header{
+padding:15px 25px;
+border-bottom:1px solid #ddd;
+font-weight:600;
+color:var(--primary);
+}
+
+#messages{
+flex:1;
+padding:20px;
+overflow-y:auto;
+display:flex;
+flex-direction:column;
+gap:10px;
+background:#f9f9f9;
+}
+
+.message-bubble{
+padding:10px 15px;
+border-radius:18px;
+max-width:65%;
+font-size:14px;
+position:relative;
+}
+
+.my-message{
+background:var(--my-msg);
+color:white;
+align-self:flex-end;
+}
+
+.other-message{
+background:var(--other-msg);
+align-self:flex-start;
+}
+
+#form{
+display:flex;
+padding:20px;
+border-top:1px solid #eee;
+gap:10px;
+}
+
+#user-text{
+flex:1;
+padding:12px 20px;
+border-radius:25px;
+border:1px solid #ddd;
+outline:none;
+background:#f0f2f5;
+}
+
+button{
+background:var(--primary);
+color:white;
+border:none;
+padding:10px 25px;
+border-radius:25px;
+cursor:pointer;
+font-weight:bold;
+}
+
+</style>
+</head>
+
+<body>
+
+<div class="sidebar">
+
+<div class="sidebar-header">
+Kontakty ({{ current_user }})
+</div>
+
+<div id="user-list">
+
+{% for user in users %}
+
+<div class="user-item"
+id="user-{{ user.user_name }}"
+onclick="selectUser('{{ user.user_name }}')">
+
+<span>{{ user.user_name }}</span>
+
+<span class="notification" id="notif-{{ user.user_name }}"></span>
+
+</div>
+
+{% endfor %}
+
+</div>
+
+</div>
+
+<div class="chat-area">
+
+<div class="chat-header">
+Czat z: <span id="chat-title">-</span>
+</div>
+
+<div id="messages"></div>
+
+<form id="form">
+
+<input
+type="text"
+id="user-text"
+placeholder="Napisz wiadomość..."
+autocomplete="off"
+>
+
+<input type="file" id="file-input">
+
+<button type="submit">Wyślij</button>
+
+</form>
+
+</div>
+
+<script>
+
+const getCookie=n=>(document.cookie.match('(^|;)\\s*'+n+'\\s*=\\s*([^;]+)')||[])[2]
+
+const userName=decodeURIComponent(getCookie("user_name")||"Anonim")
+
+let selectedReceiver=null
+
+const notifications={}
+
+const ws=new WebSocket(`ws://${window.location.host}/ws/${encodeURIComponent(userName)}`)
+
+const messagesDiv=document.getElementById('messages')
+
+function appendMessage(sender,text,id){
+
+const msg=document.createElement('div')
+
+msg.className="message-bubble "+(sender===userName?"my-message":"other-message")
+
+msg.innerText=text
+
+messagesDiv.appendChild(msg)
+
+messagesDiv.scrollTop=messagesDiv.scrollHeight
+
+}
+
+function appendFile(sender,file,url){
+
+const msg=document.createElement("div")
+
+msg.className="message-bubble "+(sender===userName?"my-message":"other-message")
+
+const link=document.createElement("a")
+
+link.href=url
+link.target="_blank"
+link.innerText="📎 "+file
+link.download=file
+
+msg.appendChild(link)
+
+messagesDiv.appendChild(msg)
+
+messagesDiv.scrollTop=messagesDiv.scrollHeight
+
+}
+
+async function loadNotifications(){
+
+const res=await fetch("/notifications")
+
+const data=await res.json()
+
+for(const user in data){
+
+notifications[user]=data[user]
+
+const badge=document.getElementById(`notif-${user}`)
+
+if(badge){
+
+badge.style.display="inline"
+badge.innerText=data[user]
+
+}
+
+}
+
+}
+
+async function selectUser(name){
+
+selectedReceiver=name
+
+document.getElementById('chat-title').innerText=name
+
+document.querySelectorAll('.user-item').forEach(i=>{
+i.classList.toggle('active',i.id===`user-${name}`)
+})
+
+if(notifications[name]){
+notifications[name]=0
+const badge=document.getElementById(`notif-${name}`)
+badge.style.display="none"
+}
+
+fetch("/read/"+name,{method:"POST"})
+
+messagesDiv.innerHTML="Ładowanie..."
+
+const res=await fetch(`/messages/${encodeURIComponent(name)}`)
+
+const history=await res.json()
+
+messagesDiv.innerHTML=""
+
+history.forEach(m=>{
+
+if(m.text){
+appendMessage(m.sender,m.text,m.id)
+}
+
+if(m.file){
+appendFile(m.sender,m.file,m.file_url)
+}
+
+})
+
+}
+
+ws.onmessage=e=>{
+
+const data=JSON.parse(e.data)
+
+if(data.type==="message"){
+
+if(data.sender===selectedReceiver){
+appendMessage(data.sender,data.text,data.id)
+}
+else{
+
+if(!notifications[data.sender]){
+notifications[data.sender]=0
+}
+
+notifications[data.sender]++
+
+const badge=document.getElementById(`notif-${data.sender}`)
+
+if(badge){
+badge.style.display="inline"
+badge.innerText=notifications[data.sender]
+}
+
+}
+
+}
+
+if(data.type==="file"){
+
+if(data.sender===selectedReceiver){
+appendFile(data.sender,data.file_name,data.file_url)
+}
+else{
+
+if(!notifications[data.sender]){
+notifications[data.sender]=0
+}
+
+notifications[data.sender]++
+
+const badge=document.getElementById(`notif-${data.sender}`)
+
+if(badge){
+badge.style.display="inline"
+badge.innerText=notifications[data.sender]
+}
+
+}
+
+}
+
+}
+
+document.getElementById('form').onsubmit=async e=>{
+
+e.preventDefault()
+
+const text=document.getElementById("user-text")
+const file=document.getElementById("file-input")
+
+if(file.files.length>0 && selectedReceiver){
+
+const formData=new FormData()
+
+formData.append("file",file.files[0])
+formData.append("to",selectedReceiver)
+
+await fetch("/upload",{
+method:"POST",
+body:formData
+})
+
+file.value=""
+
+}
+
+if(text.value.trim() && selectedReceiver){
+
+ws.send(JSON.stringify({
+to:selectedReceiver,
+text:text.value
+}))
+
+text.value=""
+
+}
+
+}
+
+loadNotifications()
+
+</script>
+
+
+</body>
+</html>
